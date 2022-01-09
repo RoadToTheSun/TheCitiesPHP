@@ -28,14 +28,16 @@ function is_already_used($city) {
 function generate_next_city($cur_city, $all, $used)
 {
     global $available;
-    $available = available_cities($cur_city, $all, $used);
+    $available = available_cities($all, $used, $cur_city);
     return sizeof($available)!=0 ? $available[array_rand($available)] : null;
 }
 
-function available_cities($cur_city, $all_cities, $used_cities) {
+function available_cities($all_cities, $used_cities, $cur_city=null) {
+    if (is_null($cur_city))
+        return $all_cities;
     $available = [];
     $invalid = array("ы","ь","ъ","й");
-    echo $cur_city;
+//    echo $cur_city;
 //    TODO
     $letter = in_array(iconv_substr($cur_city, -1, 1), $invalid) ? iconv_substr($cur_city, -2, 1) : iconv_substr($cur_city, -1, 1);
 //    echo "letter is " . $letter;
@@ -49,6 +51,16 @@ function available_cities($cur_city, $all_cities, $used_cities) {
     return $available;
 }
 
+function is_user_city_correct($user_city, $server_city, $available_user_cities) {
+    $correct_user_city=false;
+    foreach ($available_user_cities as $correct) {
+        if (my_str_to_lower($user_city)===my_str_to_lower($correct)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 $cities = get_cities_from_csv("cities.csv");
 $used_cities = [];
 $available = [];
@@ -56,6 +68,7 @@ $game_over = false;
 $message = "";
 $user_city = "";
 $server_city = "";
+$available_user_cities = [];
 
 if (isset($_GET["concede"])) {
     $game_over = true;
@@ -63,6 +76,7 @@ if (isset($_GET["concede"])) {
 }
 
 elseif (isset($_GET["new-game"])) {
+//    unnecessary
 //    $game_over = false;
 }
 
@@ -71,11 +85,18 @@ elseif (isset($_REQUEST["submit"])) {
         $user_city = $_GET["user"];
         $used_cities = isset($_GET["used"]) ? $_GET["used"] : [];
         $server_city = $_GET["server"];
+        $server_city_exists = $server_city!="";
+        $available_user_cities = available_cities($GLOBALS["cities"], $GLOBALS["used_cities"], $server_city_exists? $server_city : null);
+
         if (is_already_used($user_city)) {
             $message = "City was already used";
         }
+        elseif (!is_user_city_correct($user_city, $server_city, $available_user_cities)) {
+            $message = "Incorrect city, pls type another one";
+        }
         else {
             $server_city = generate_next_city($user_city, $cities, $used_cities);
+            $available_user_cities = available_cities($GLOBALS["cities"], $GLOBALS["used_cities"], $server_city);
             if (is_null($server_city)) {
                 $game_over = true;
                 $message = "You won!";
@@ -123,15 +144,25 @@ else {
 
         if (sizeof($used_cities) && !$game_over) {
         ?>
-        <h3>Сервер выбрал: </h3>
-        <?php
-            foreach ($available as $city) {
-                if ($city===$server_city) echo "<span style='color: red'>$city</span>";
-                else echo $city;
-                echo "<br>";
-            }
-        }
-        ?>
+        <div style="display: inline-block">
+            <div class="server-pick"><h3>Сервер выбрал: </h3>
+                <?php
+                foreach ($available as $city) {
+                    if ($city === $server_city) echo "<span style='color: red'>$city</span>";
+                    else echo $city;
+                    echo "<br>";
+                }
+                }
+                ?></div>
+            <div class="user-pick"><h3>Вам доступны города: </h3>
+                <?php
+                foreach ($available_user_cities as $city) {
+                    echo $city;
+                    echo "<br>";
+                }
+                ?>
+            </div>
+        </div>
     </div>
 </form>
 </body>
